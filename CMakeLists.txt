@@ -1,11 +1,18 @@
 cmake_minimum_required(VERSION 3.18...3.28)
-project(AplusC)
+# Must enable languages here so that calls after FetchContent works
+project(AplusC LANGUAGES C CXX CUDA)
 
+include(CTest)
 include(FetchContent)
 
-# Try both as FetchContent. Probably AdePT first as it's more restrictive?
-# Also need G4HepEM as submodule for AdePT
-# ... Add hard options here (e.g. CELERITAS_USE_Geant4)
+# -- Externals
+# Set up default options here (TBR if we want users to set these)
+# Or.. in CMake setting files
+set(CELERITAS_USE_CUDA ON)
+set(CELERITAS_USE_Geant4 ON)
+set(CELERITAS_USE_MPI OFF)
+set(CELERITAS_USE_SWIG OFF)
+
 FetchContent_Declare(
   adept
   GIT_REPOSITORY https://github.com/apt-sim/adept.git
@@ -18,3 +25,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(adept celeritas)
 
+# Post fetchcontent setup
+list(APPEND CMAKE_MODULE_PATH ${celeritas_SOURCE_DIR}/cmake)
+find_package(Geant4 REQUIRED)
+
+# -- Basic smoke test program from Celeritas
+include(CeleritasLibrary)
+add_executable(celer-trackingmanager-offload celer-trackingmanager-offload.cc)
+celeritas_target_link_libraries(celer-trackingmanager-offload
+  Celeritas::accel
+  ${Geant4_LIBRARIES}
+)
