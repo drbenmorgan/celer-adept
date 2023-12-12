@@ -33,6 +33,7 @@ find_package(Geant4 REQUIRED)
 include(CeleritasLibrary)
 celeritas_add_library(GPUOffload
   GPUOffload/GPUOffload.cc
+  GPUOffload/adept/AdeptOffload.cc
   GPUOffload/celeritas/CeleritasOffload.cc
   GPUOffload/celeritas/Celeritas.cc)
 celeritas_target_include_directories(GPUOffload
