@@ -3,7 +3,7 @@
 // See the top-level COPYRIGHT file for details.
 // SPDX-License-Identifier: (Apache-2.0 OR MIT)
 //---------------------------------------------------------------------------//
-//! \file example/accel/trackingmanager-offload.cc
+//! \file trackingmanager-offload.cc
 //---------------------------------------------------------------------------//
 
 #include <algorithm>
@@ -16,6 +16,8 @@
 #include <G4Gamma.hh>
 #include <G4LogicalVolume.hh>
 #include <G4Material.hh>
+#include <G4MultiFunctionalDetector.hh>
+#include <G4PSEnergyDeposit.hh>
 #include <G4PVPlacement.hh>
 #include <G4ParticleDefinition.hh>
 #include <G4ParticleGun.hh>
@@ -24,6 +26,7 @@
 #include <G4Region.hh>
 #include <G4RegionStore.hh>
 #include <G4RunManagerFactory.hh>
+#include <G4SDManager.hh>
 #include <G4SystemOfUnits.hh>
 #include <G4Threading.hh>
 #include <G4ThreeVector.hh>
@@ -45,138 +48,7 @@
 #include <corecel/Macros.hh>
 #include <corecel/io/Logger.hh>
 
-namespace
-{
-//---------------------------------------------------------------------------//
-// Global shared setup options
-celeritas::SetupOptions setup_options;
-// Shared data and GPU setup
-celeritas::SharedParams shared_params;
-// Thread-local transporter
-G4ThreadLocal celeritas::LocalTransporter local_transporter;
-
-// Simple interface to running celeritas
-G4ThreadLocal celeritas::SimpleOffload simple_offload;
-
-//---------------------------------------------------------------------------//
-// Make offload and implementation detail to hide use of AdePT/Celeritas
-class GPUTrackingManager final : public G4VTrackingManager
-{
-  public:
-    // Some common parameters?
-    enum class Offload
-    {
-        Celeritas,
-        Adept,
-        size_
-    };
-
-  public:
-    GPUTrackingManager() = delete;
-    // Construct only from params or similar
-    explicit GPUTrackingManager(Offload const&);
-
-    // Prepare cross-section tables for rebuild (e.g. if new materials have
-    // been defined).
-    void PreparePhysicsTable(G4ParticleDefinition const&) override;
-
-    // Rebuild physics cross-section tables (e.g. if new materials have been
-    // defined).
-    void BuildPhysicsTable(G4ParticleDefinition const&) override;
-
-    // Hand over passed track to this tracking manager.
-    void HandOverOneTrack(G4Track* aTrack) override;
-
-    // Complete processing of any buffered tracks.
-    void FlushEvent() override;
-
-  private:
-    std::unique_ptr<G4VTrackingManager> impl_{nullptr};
-};
-
-// Just decalre this for now
-class AdeptTrackingManager final : public G4VTrackingManager
-{
-    // Prepare cross-section tables for rebuild (e.g. if new materials have
-    // been defined).
-    void PreparePhysicsTable(G4ParticleDefinition const&) override {}
-
-    // Rebuild physics cross-section tables (e.g. if new materials have been
-    // defined).
-    void BuildPhysicsTable(G4ParticleDefinition const&) override {}
-
-    // Hand over passed track to this tracking manager.
-    void HandOverOneTrack(G4Track* aTrack) override {}
-
-    // Complete processing of any buffered tracks.
-    void FlushEvent() override {}
-};
-
-GPUTrackingManager::GPUTrackingManager(Offload const& om)
-{
-    switch (om)
-    {
-        case Offload::Adept: {
-            impl_ = std::make_unique<AdeptTrackingManager>(/*???*/);
-            break;
-        }
-        case Offload::Celeritas: {
-            impl_ = std::make_unique<celeritas::TrackingManagerOffload>(
-                &shared_params, &local_transporter);
-            break;
-        }
-        default: {
-            CELER_ASSERT_UNREACHABLE();
-        }
-    }
-}
-
-// Rest of functions would just forward to underlying impl
-void GPUTrackingManager::PreparePhysicsTable(G4ParticleDefinition const& p)
-{
-    impl_->PreparePhysicsTable(p);
-}
-
-void GPUTrackingManager::BuildPhysicsTable(G4ParticleDefinition const& p)
-{
-    impl_->BuildPhysicsTable(p);
-}
-
-void GPUTrackingManager::HandOverOneTrack(G4Track* aTrack)
-{
-    impl_->HandOverOneTrack(aTrack);
-}
-
-void GPUTrackingManager::FlushEvent()
-{
-    impl_->FlushEvent();
-}
-
-
-//---------------------------------------------------------------------------//
-class DetectorConstruction final : public G4VUserDetectorConstruction
-{
-  public:
-    DetectorConstruction()
-        : aluminum_{new G4Material{
-            "Aluminium", 13., 26.98 * g / mole, 2.700 * g / cm3}}
-    {
-        setup_options.make_along_step = celeritas::UniformAlongStepFactory();
-    }
-
-    G4VPhysicalVolume* Construct() final
-    {
-        CELER_LOG_LOCAL(status) << "Setting up detector";
-        auto* box = new G4Box("world", 1000 * cm, 1000 * cm, 1000 * cm);
-        auto* lv = new G4LogicalVolume(box, aluminum_, "world");
-        auto* pv = new G4PVPlacement(
-            0, G4ThreeVector{}, lv, "world", nullptr, false, 0);
-        return pv;
-    }
-
-  private:
-    G4Material* aluminum_;
-};
+#include "GPUOffload/GPUOffload.hh"
 
 //---------------------------------------------------------------------------//
 class EMPhysicsConstructor final : public G4EmStandardPhysics
@@ -189,15 +61,51 @@ class EMPhysicsConstructor final : public G4EmStandardPhysics
         CELER_LOG_LOCAL(status) << "Setting up tracking manager offload";
         G4EmStandardPhysics::ConstructProcess();
 
-        // Add Celeritas tracking manager to electron, positron, gamma.
+        // Create and add the chosen GPU tracking manager to EM particles
         // NB: this ultimately should be thread-local, but G4 -should- ensure
         // that for us
-        auto* gpu_tracking
-            = new GPUTrackingManager(GPUTrackingManager::Offload::Celeritas);
-        G4Electron::Definition()->SetTrackingManager(gpu_tracking);
-        G4Positron::Definition()->SetTrackingManager(gpu_tracking);
-        G4Gamma::Definition()->SetTrackingManager(gpu_tracking);
+        auto gpu_tracking = GPUOffload().MakeTrackingManager();
+        G4Electron::Definition()->SetTrackingManager(gpu_tracking.get());
+        G4Positron::Definition()->SetTrackingManager(gpu_tracking.get());
+        G4Gamma::Definition()->SetTrackingManager(gpu_tracking.get());
+        // Geant4 will take ownership of the pointer, so we can release it here
+        gpu_tracking.release();
     }
+};
+
+//---------------------------------------------------------------------------//
+class DetectorConstruction final : public G4VUserDetectorConstruction
+{
+  public:
+    DetectorConstruction()
+        : aluminum_{new G4Material{
+            "Aluminium", 13., 26.98 * g / mole, 2.700 * g / cm3}}
+    {
+    }
+
+    G4VPhysicalVolume* Construct() final
+    {
+        CELER_LOG_LOCAL(status) << "Setting up detector";
+        auto* box = new G4Box("world", 1000 * cm, 1000 * cm, 1000 * cm);
+        auto* lv = new G4LogicalVolume(box, aluminum_, "world");
+        auto* pv = new G4PVPlacement(
+            0, G4ThreeVector{}, lv, "world", nullptr, false, 0);
+        return pv;
+    }
+
+    // Celeritas will fail if sds are active but none are found, so we just
+    // add a simple PS here (we don't use the results yet)
+    void ConstructSDandField()
+    {
+        auto mfd = new G4MultiFunctionalDetector("world");
+        G4SDManager::GetSDMpointer()->AddNewDetector(mfd);
+        auto scorer = new G4PSEnergyDeposit("edep");
+        mfd->RegisterPrimitive(scorer);
+        SetSensitiveDetector("world", mfd);
+    }
+
+  private:
+    G4Material* aluminum_;
 };
 
 //---------------------------------------------------------------------------//
@@ -231,11 +139,11 @@ class RunAction final : public G4UserRunAction
   public:
     void BeginOfRunAction(G4Run const* run) final
     {
-        simple_offload.BeginOfRunAction(run);
+        GPUOffload().BeginOfRunAction(run);
     }
     void EndOfRunAction(G4Run const* run) final
     {
-        simple_offload.EndOfRunAction(run);
+        GPUOffload().EndOfRunAction(run);
     }
 };
 
@@ -245,7 +153,12 @@ class EventAction final : public G4UserEventAction
   public:
     void BeginOfEventAction(G4Event const* event) final
     {
-        simple_offload.BeginOfEventAction(event);
+        GPUOffload().BeginOfEventAction(event);
+    }
+
+    void EndOfEventAction(G4Event const* event) final
+    {
+        GPUOffload().EndOfEventAction(event);
     }
 };
 
@@ -255,7 +168,7 @@ class ActionInitialization final : public G4VUserActionInitialization
   public:
     void BuildForMaster() const final
     {
-        simple_offload.BuildForMaster(&setup_options, &shared_params);
+        GPUOffload().BuildForMaster();
 
         CELER_LOG_LOCAL(status) << "Constructing user actions";
 
@@ -263,8 +176,7 @@ class ActionInitialization final : public G4VUserActionInitialization
     }
     void Build() const final
     {
-        simple_offload.Build(
-            &setup_options, &shared_params, &local_transporter);
+        GPUOffload().Build();
 
         CELER_LOG_LOCAL(status) << "Constructing user actions";
 
@@ -275,7 +187,6 @@ class ActionInitialization final : public G4VUserActionInitialization
 };
 
 //---------------------------------------------------------------------------//
-}  // namespace
 
 int main()
 {
@@ -291,17 +202,11 @@ int main()
     run_manager->SetUserInitialization(physics_list);
 
     run_manager->SetUserInitialization(new ActionInitialization());
-
-    // NOTE: these numbers are appropriate for CPU execution
-    setup_options.max_num_tracks = 1024;
-    setup_options.initializer_capacity = 1024 * 128;
-    // This parameter will eventually be removed
-    setup_options.max_num_events = 1024;
-    // Celeritas does not support EmStandard MSC physics above 100 MeV
-    setup_options.ignore_processes = {"CoulombScat"};
-
     run_manager->Initialize();
-    run_manager->BeamOn(1);
+    // Do two runs to check behaviour between
+    run_manager->BeamOn(8);
+    // This causes an exception in Celeritas "celeritas::activate_device may be called only once per application"
+    //run_manager->BeamOn(16);
 
     return 0;
 }

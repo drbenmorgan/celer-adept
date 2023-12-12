@@ -6,7 +6,7 @@ include(CTest)
 include(FetchContent)
 
 # -- Externals
-# Set up default options here (TBR if we want users to set these)
+# Set up default options here (TBD if we want users to set these)
 # Or.. in CMake setting files
 set(CELERITAS_USE_CUDA ON)
 set(CELERITAS_USE_Geant4 ON)
@@ -29,10 +29,26 @@ FetchContent_MakeAvailable(adept celeritas)
 list(APPEND CMAKE_MODULE_PATH ${celeritas_SOURCE_DIR}/cmake)
 find_package(Geant4 REQUIRED)
 
-# -- Basic smoke test program from Celeritas
+# -- Build the offloader library
 include(CeleritasLibrary)
-add_executable(celer-trackingmanager-offload celer-trackingmanager-offload.cc)
-celeritas_target_link_libraries(celer-trackingmanager-offload
+celeritas_add_library(GPUOffload
+  GPUOffload/GPUOffload.cc
+  GPUOffload/celeritas/CeleritasOffload.cc
+  GPUOffload/celeritas/Celeritas.cc)
+celeritas_target_include_directories(GPUOffload
+  PUBLIC
+    "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/GPUOffload>"
+    "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
+)
+celeritas_target_link_libraries(GPUOffload
   Celeritas::accel
+  ${Geant4_LIBRARIES}
+)
+
+# Minimal exe. Use celeritas linking to resolve RDC linking if shared libs are used
+add_executable(trackingmanager-offload trackingmanager-offload.cc)
+celeritas_target_link_libraries(trackingmanager-offload
+  Celeritas::accel
+  GPUOffload
   ${Geant4_LIBRARIES}
 )
