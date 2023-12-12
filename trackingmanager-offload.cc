@@ -40,9 +40,71 @@
 #include <G4VUserDetectorConstruction.hh>
 #include <G4VUserPrimaryGeneratorAction.hh>
 
+
+//---------------------------------------------------------------------------//
+// - Parts coupled to the offload
+
+// Frontend "factory" function
 #include "GPUOffload/GPUOffload.hh"
 
 //---------------------------------------------------------------------------//
+// - RunAction used to notify the offloader of the Begin/End of Run
+class RunAction final : public G4UserRunAction
+{
+  public:
+    void BeginOfRunAction(G4Run const* run) final
+    {
+        GPUOffload().BeginOfRunAction(run);
+    }
+    void EndOfRunAction(G4Run const* run) final
+    {
+        GPUOffload().EndOfRunAction(run);
+    }
+};
+
+//---------------------------------------------------------------------------//
+// - EventAction used to notify the offloader of the Begin/End of Event
+class EventAction final : public G4UserEventAction
+{
+  public:
+    void BeginOfEventAction(G4Event const* event) final
+    {
+        GPUOffload().BeginOfEventAction(event);
+    }
+
+    void EndOfEventAction(G4Event const* event) final
+    {
+        GPUOffload().EndOfEventAction(event);
+    }
+};
+
+//---------------------------------------------------------------------------//
+// - Set up the needed Run/Event Actions
+// - Notify the offloader of the Build/BuildForMaster states
+class ActionInitialization final : public G4VUserActionInitialization
+{
+  public:
+    void BuildForMaster() const final
+    {
+        GPUOffload().BuildForMaster();
+        this->SetUserAction(new RunAction{});
+    }
+    void Build() const final
+    {
+        GPUOffload().Build();
+        this->SetUserAction(new PrimaryGeneratorAction{});
+        this->SetUserAction(new RunAction{});
+        this->SetUserAction(new EventAction{});
+    }
+};
+
+
+//---------------------------------------------------------------------------//
+// - Custom PhysicsConstructor to add the Offloader's G4VTrackingManager to
+//   e-/e+/gamma particles.
+// - Inherited from G4EmStandardPhysics because we want to ensure that the
+//   CPU processes/models are constructed properly (To be reviewed, and see
+//   also G4 RE07 example).
 class EMPhysicsConstructor final : public G4EmStandardPhysics
 {
   public:
@@ -64,6 +126,8 @@ class EMPhysicsConstructor final : public G4EmStandardPhysics
     }
 };
 
+//---------------------------------------------------------------------------//
+// Non-coupled to offloader as yet
 //---------------------------------------------------------------------------//
 class DetectorConstruction final : public G4VUserDetectorConstruction
 {
@@ -122,52 +186,6 @@ class PrimaryGeneratorAction final : public G4VUserPrimaryGeneratorAction
     G4ParticleGun gun_;
 };
 
-//---------------------------------------------------------------------------//
-class RunAction final : public G4UserRunAction
-{
-  public:
-    void BeginOfRunAction(G4Run const* run) final
-    {
-        GPUOffload().BeginOfRunAction(run);
-    }
-    void EndOfRunAction(G4Run const* run) final
-    {
-        GPUOffload().EndOfRunAction(run);
-    }
-};
-
-//---------------------------------------------------------------------------//
-class EventAction final : public G4UserEventAction
-{
-  public:
-    void BeginOfEventAction(G4Event const* event) final
-    {
-        GPUOffload().BeginOfEventAction(event);
-    }
-
-    void EndOfEventAction(G4Event const* event) final
-    {
-        GPUOffload().EndOfEventAction(event);
-    }
-};
-
-//---------------------------------------------------------------------------//
-class ActionInitialization final : public G4VUserActionInitialization
-{
-  public:
-    void BuildForMaster() const final
-    {
-        GPUOffload().BuildForMaster();
-        this->SetUserAction(new RunAction{});
-    }
-    void Build() const final
-    {
-        GPUOffload().Build();
-        this->SetUserAction(new PrimaryGeneratorAction{});
-        this->SetUserAction(new RunAction{});
-        this->SetUserAction(new EventAction{});
-    }
-};
 
 //---------------------------------------------------------------------------//
 
@@ -179,7 +197,8 @@ int main()
     run_manager->SetUserInitialization(new DetectorConstruction{});
 
     // Use FTFP_BERT, but replace EM constructor with our own that
-    // overrides ConstructProcess to use Celeritas tracking for e-/e+/g
+    // overrides ConstructProcess to use GPU tracking for e-/e+/g
+    // Could also be dedicated PhysList, but this is easiest demo for now.
     auto physics_list = new FTFP_BERT{/* verbosity = */ 0};
     physics_list->ReplacePhysics(new EMPhysicsConstructor);
     run_manager->SetUserInitialization(physics_list);
