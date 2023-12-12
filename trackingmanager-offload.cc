@@ -39,14 +39,6 @@
 #include <G4VUserActionInitialization.hh>
 #include <G4VUserDetectorConstruction.hh>
 #include <G4VUserPrimaryGeneratorAction.hh>
-#include <accel/AlongStepFactory.hh>
-#include <accel/LocalTransporter.hh>
-#include <accel/SetupOptions.hh>
-#include <accel/SharedParams.hh>
-#include <accel/SimpleOffload.hh>
-#include <accel/TrackingManagerOffload.hh>
-#include <corecel/Macros.hh>
-#include <corecel/io/Logger.hh>
 
 #include "GPUOffload/GPUOffload.hh"
 
@@ -58,7 +50,6 @@ class EMPhysicsConstructor final : public G4EmStandardPhysics
 
     void ConstructProcess() override
     {
-        CELER_LOG_LOCAL(status) << "Setting up tracking manager offload";
         G4EmStandardPhysics::ConstructProcess();
 
         // Create and add the chosen GPU tracking manager to EM particles
@@ -85,7 +76,6 @@ class DetectorConstruction final : public G4VUserDetectorConstruction
 
     G4VPhysicalVolume* Construct() final
     {
-        CELER_LOG_LOCAL(status) << "Setting up detector";
         auto* box = new G4Box("world", 1000 * cm, 1000 * cm, 1000 * cm);
         auto* lv = new G4LogicalVolume(box, aluminum_, "world");
         auto* pv = new G4PVPlacement(
@@ -125,7 +115,6 @@ class PrimaryGeneratorAction final : public G4VUserPrimaryGeneratorAction
     // Generate 100 GeV neutrons
     void GeneratePrimaries(G4Event* event) final
     {
-        CELER_LOG_LOCAL(status) << "Generating primaries";
         gun_.GeneratePrimaryVertex(event);
     }
 
@@ -169,17 +158,11 @@ class ActionInitialization final : public G4VUserActionInitialization
     void BuildForMaster() const final
     {
         GPUOffload().BuildForMaster();
-
-        CELER_LOG_LOCAL(status) << "Constructing user actions";
-
         this->SetUserAction(new RunAction{});
     }
     void Build() const final
     {
         GPUOffload().Build();
-
-        CELER_LOG_LOCAL(status) << "Constructing user actions";
-
         this->SetUserAction(new PrimaryGeneratorAction{});
         this->SetUserAction(new RunAction{});
         this->SetUserAction(new EventAction{});

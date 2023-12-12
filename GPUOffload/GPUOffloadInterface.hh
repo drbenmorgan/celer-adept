@@ -2,18 +2,19 @@
 
 #include <memory>
 
+#include "G4VTrackingManager.hh"
+
 class G4Event;
 class G4Run;
-class G4VTrackingManager;
 
 // This largely reproduces Celeritas' SimpleOffload interface, making the
-// calls pure virtual so we can override these as needed for Celeritas AND AdePT.
-// It adds the MakeTrackingManager to return the concrete G4VTrackingManager for
-// the offload.
+// calls pure virtual so we can override these as needed for Celeritas AND
+// AdePT. It adds the MakeTrackingManager to return the concrete
+// G4VTrackingManager for the offload.
 //
-// TODO: There will certainly be setup options to pass, but this is to be determined
-// what's common/divergent between AdePT/Celeritas. We try to hide the implementation
-// of these AFAP.
+// TODO: There will certainly be setup options to pass, but this is to be
+// determined what's common/divergent between AdePT/Celeritas. We try to hide
+// the implementation of these AFAP.
 class GPUOffloadInterface
 {
   public:
