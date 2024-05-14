@@ -1,7 +1,7 @@
 #include "CeleritasOffload.hh"
 
-
 #include <accel/TrackingManagerOffload.hh>
+
 #include "Celeritas.hh"
 
 void CeleritasOffload::Build()
