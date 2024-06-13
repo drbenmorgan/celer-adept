@@ -8,7 +8,7 @@ namespace celeritas
 class LocalTransporter;
 struct SetupOptions;
 class SharedParams;
-}
+}  // namespace celeritas
 
 // Global shared setup options
 celeritas::SetupOptions& CelerSetupOptions();

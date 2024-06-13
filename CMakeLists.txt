@@ -6,50 +6,85 @@ include(CTest)
 include(FetchContent)
 
 # -- Externals
+# Here we now have an issue of possible duplication, so we
+# 1. Setup Celeritas first,
+# 2. then G4VG so it uses local Celeritas::geocel,
+# 3. then AdePT so it uses local G4VG
+# If/when G4VG becomes standalone, this will continue to work depending
+# on how AdePT/Celeritas pick it up
+
+# We have to set this so that packages found/required by Celeritas
+# are visible when linking Celeritas to g4vg/AdePT
+set(CMAKE_FIND_PACKAGE_TARGETS_GLOBAL ON)
+
 # Set up default options here (TBD if we want users to set these)
 # Or.. in CMake setting files
 set(CELERITAS_USE_CUDA ON)
 set(CELERITAS_USE_Geant4 ON)
+set(CELERITAS_USE_VecGeom ON)
 set(CELERITAS_USE_MPI OFF)
 set(CELERITAS_USE_SWIG OFF)
+set(CELERITAS_USE_Python OFF)
+set(CELERITAS_USE_ROOT OFF)
+# These are required for correct interworking...
+set(CELERITAS_CORE_GEO VecGeom)
+set(CELERITAS_UNITS CLHEP)
+set(CELERITAS_REAL_TYPE double)
 
-FetchContent_Declare(
-  adept
-  GIT_REPOSITORY https://github.com/apt-sim/adept.git
-  GIT_TAG        8e7b9b49f1730f8db6ff3520942fd5ae64760b21 # master, so will need to bring in code from MR 268!
-)
 FetchContent_Declare(
   celeritas
   GIT_REPOSITORY https://github.com/celeritas-project/celeritas.git
-  GIT_TAG        c0f4129c391a6d7cfad41f3e0e3ccd0445633732 # v0.4.1
+  GIT_TAG        90c62fe91545d1ed92b29256ddce1a2af3132ada # develop
 )
-FetchContent_MakeAvailable(adept celeritas)
+FetchContent_MakeAvailable(celeritas)
+
+# Force Celeritas "found" so g4vg will use Celeritas::geocel from local FetchContent
+set(Celeritas_FOUND ON)
+FetchContent_Declare(
+  g4vg
+  GIT_REPOSITORY https://github.com/celeritas-project/g4vg.git
+  GIT_TAG        9fd87968a8248e0050e831fffdd89e0346b96147 # main
+)
+FetchContent_MakeAvailable(g4vg)
+
+# As above, force G4VG "found" so AdePT will use G4VG from local FetchContent
+# TODO: work out why this fails with "No known features for CUDA compiler" for
+# the flush try-compile on first run, but succeeds on second.
+set(G4VG_FOUND ON)
+FetchContent_Declare(
+  adept
+  GIT_REPOSITORY https://github.com/drbenmorgan/adept.git
+  GIT_TAG        c30469b0f074f9015d809817363c6a44c665d890 # update-g4vg
+)
+FetchContent_MakeAvailable(adept)
 
 # Post fetchcontent setup
 list(APPEND CMAKE_MODULE_PATH ${celeritas_SOURCE_DIR}/cmake)
 find_package(Geant4 REQUIRED)
 
 # -- Build the offloader library
-include(CeleritasLibrary)
-celeritas_add_library(GPUOffload
+include(CudaRdcUtils)
+cuda_rdc_add_library(GPUOffload
   GPUOffload/GPUOffload.cc
   GPUOffload/adept/AdeptOffload.cc
   GPUOffload/celeritas/CeleritasOffload.cc
-  GPUOffload/celeritas/Celeritas.cc)
-celeritas_target_include_directories(GPUOffload
+  GPUOffload/celeritas/Celeritas.cc
+  GPUOffload/none/NoOffload.cc)
+cuda_rdc_target_include_directories(GPUOffload
   PUBLIC
     "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/GPUOffload>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
 )
-celeritas_target_link_libraries(GPUOffload
+cuda_rdc_target_link_libraries(GPUOffload
   Celeritas::accel
+  AdePT::AdePT_G4_integration
   ${Geant4_LIBRARIES}
 )
 
 # Minimal exe. Use celeritas linking to resolve RDC linking if shared libs are used
 add_executable(trackingmanager-offload trackingmanager-offload.cc)
-celeritas_target_link_libraries(trackingmanager-offload
-  Celeritas::accel
+cuda_rdc_target_link_libraries(trackingmanager-offload
   GPUOffload
   ${Geant4_LIBRARIES}
 )
+add_test(NAME trackingmanager-offload COMMAND trackingmanager-offload)
