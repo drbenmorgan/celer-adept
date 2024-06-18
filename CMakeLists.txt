@@ -34,7 +34,7 @@ set(CELERITAS_REAL_TYPE double)
 FetchContent_Declare(
   celeritas
   GIT_REPOSITORY https://github.com/celeritas-project/celeritas.git
-  GIT_TAG        90c62fe91545d1ed92b29256ddce1a2af3132ada # develop
+  GIT_TAG        17d96db867322102a7bb6f18a46ecda13871cd37 # develop
 )
 FetchContent_MakeAvailable(celeritas)
 
