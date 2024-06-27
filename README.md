@@ -48,3 +48,11 @@ what's going on (and provide a basis for Doxygen going forward).
 This hardcodes the use of Celeritas offload, but this can be changed for
 the AdePT and no offload cases in `GPUOffload/GPUOffload.hh`.
 
+# Known Limitations
+## Only one Run is permitted after initialization
+As shown in [`trackingmanager-offload.cc`](./trackingmanager-offload.cc), only one
+call to `G4RunManager::BeamOn` can be made per application execution. This is due
+to the potential for geometry/physics to change between runs which would require
+reinitialization of GPU-side data for AdePT/Celeritas. Neither project supports
+this capability yet, as the primary HEP production use case does not require this.
+This may be added later, but for now only one run is supported.

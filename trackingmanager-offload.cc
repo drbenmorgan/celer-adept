@@ -298,11 +298,10 @@ int main()
 
     run_manager->SetUserInitialization(new ActionInitialization());
     run_manager->Initialize();
-    // Do two runs to check behaviour between
+    // Only a single run is allowed because the offload implementations
+    // do not currently support updating geometry/physics that might change
+    // between runs (the "Idle" state)
     run_manager->BeamOn(10);
-    // This causes an exception in Celeritas "celeritas::activate_device may be
-    // called only once per application" AdePT is fine
-    // run_manager->BeamOn(16);
 
     return 0;
 }
