@@ -1,12 +1,11 @@
 #include "GPUOffload.hh"
 
 #include <memory>
+#include <G4Exception.hh>
+#include <G4Threading.hh>
 
-#include "celeritas/CeleritasOffload.hh"
-
-#include "G4Exception.hh"
-#include "G4Threading.hh"
 #include "adept/AdeptOffload.hh"
+#include "celeritas/CeleritasOffload.hh"
 #include "none/NoOffload.hh"
 
 namespace

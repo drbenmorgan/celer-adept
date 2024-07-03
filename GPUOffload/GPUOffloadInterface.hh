@@ -1,8 +1,7 @@
 #pragma once
 
 #include <memory>
-
-#include "G4VTrackingManager.hh"
+#include <G4VTrackingManager.hh>
 
 class G4Event;
 class G4Run;
