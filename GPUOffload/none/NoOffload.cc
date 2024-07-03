@@ -1,6 +1,6 @@
 #include "NoOffload.hh"
 
-#include "G4VTrackingManager.hh"
+#include <G4VTrackingManager.hh>
 
 // Return concrete tracking manager for this offloader
 std::unique_ptr<G4VTrackingManager> NoOffload::MakeTrackingManager()
@@ -9,7 +9,7 @@ std::unique_ptr<G4VTrackingManager> NoOffload::MakeTrackingManager()
 }
 
 //! Initialization of this class on a worker thread
-void NoOffload::Build(){};
+void NoOffload::Build() {};
 
 //! Initialization of this class on the master thread
 void NoOffload::BuildForMaster() {}

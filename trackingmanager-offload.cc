@@ -197,7 +197,7 @@ class DetectorConstruction final : public G4VUserDetectorConstruction
   public:
     DetectorConstruction()
         : aluminum_{new G4Material{
-            "Aluminium", 13., 26.98 * g / mole, 2.700 * g / cm3}}
+              "Aluminium", 13., 26.98 * g / mole, 2.700 * g / cm3}}
     {
     }
 
@@ -272,6 +272,15 @@ class ActionInitialization final : public G4VUserActionInitialization
 
 int main()
 {
+    // This could come from CLI, JSON, or even set via UI commands (provided 
+    // PreInit Geant4 state requirement respected)
+    GPUOffloadOptions opts;
+    opts.backend = GPUOffloadBackend::Celeritas;
+
+    // can only be called in Geant4 PreInit stage (i.e. prior to RunManager
+    // initialization)
+    GPUOffloadSetup(opts);
+
     std::unique_ptr<G4RunManager> run_manager{
         G4RunManagerFactory::CreateRunManager()};
     run_manager->SetUserInitialization(new DetectorConstruction{});
