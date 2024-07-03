@@ -54,7 +54,7 @@ build_offloader(GPUOffloadOptions const& op)
             break;
     }
     // only logical return here, but we should never get here
-    return std::unique_ptr<GPUOffloadInterface>(nullptr);
+    return nullptr;
 }
 
 // Return ref to thread-local offloader backend
