@@ -5,8 +5,10 @@
 #include <G4Threading.hh>
 
 #include "adept/AdeptOffload.hh"
+#include "adeptcpu/AdeptCPUOffload.hh"
 #include "celeritas/CeleritasOffloadBuilder.hh"
 #include "none/NoOffload.hh"
+
 
 namespace
 {
@@ -44,13 +46,19 @@ build_offloader(GPUOffloadOptions const& op)
         // dedicated functions
         case GPUOffloadBackend::Adept:
             return std::make_unique<AdeptOffload>();
+        case GPUOffloadBackend::AdeptCPU:
+            return std::make_unique<AdeptCPUOffload>();
         case GPUOffloadBackend::Celeritas:
         case GPUOffloadBackend::CeleritasCPU:
-            return BuildCeleritasOffload(op); 
+            return BuildCeleritasOffload(op);
         case GPUOffloadBackend::None:
             return std::make_unique<NoOffload>();
         default:
             // shouldn't get here...
+            G4Exception("GPUOffload.cc::build_offloader",
+                        "GPUOffload0004",
+                        FatalException,
+                        "unknown backend value encountered");
             break;
     }
     // only logical return here, but we should never get here

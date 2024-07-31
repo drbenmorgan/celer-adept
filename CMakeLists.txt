@@ -67,6 +67,8 @@ include(CudaRdcUtils)
 cuda_rdc_add_library(GPUOffload
   GPUOffload/GPUOffload.cc
   GPUOffload/adept/AdeptOffload.cc
+  GPUOffload/adeptcpu/AdeptCPUOffload.cc
+  GPUOffload/adeptcpu/AdeptCPUTrackingManager.cc
   GPUOffload/celeritas/CeleritasOffload.cc
   GPUOffload/celeritas/CeleritasOffloadBuilder.cc
   GPUOffload/celeritas/Celeritas.cc
@@ -79,6 +81,7 @@ cuda_rdc_target_include_directories(GPUOffload
 cuda_rdc_target_link_libraries(GPUOffload
   Celeritas::accel
   AdePT::AdePT_G4_integration
+  G4HepEm::g4HepEm
   ${Geant4_LIBRARIES}
 )
 
