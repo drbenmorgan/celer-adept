@@ -1,6 +1,7 @@
 #include "CeleritasOffloadBuilder.hh"
 
 #include <G4Exception.hh>
+#include <corecel/Assert.hh>
 #include <corecel/Macros.hh>
 #include <corecel/sys/Environment.hh>
 
@@ -31,6 +32,7 @@ BuildCeleritasOffload(GPUOffloadOptions const& opts)
         // Temporary hack. Follow https://github.com/celeritas-project/celeritas/issues/1037
         // for future solution through parameters
         celeritas::environment().insert({"CELER_DISABLE_DEVICE", "1"});
+        CELER_ENSURE(celeritas::getenv("CELER_DISABLE_DEVICE") == "1");
     }
     else
     {
