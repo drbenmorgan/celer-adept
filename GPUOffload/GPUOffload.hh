@@ -7,6 +7,7 @@ enum class GPUOffloadBackend
 {
   Adept,
   Celeritas,
+  CeleritasCPU,
   None,
   Unknown
 };

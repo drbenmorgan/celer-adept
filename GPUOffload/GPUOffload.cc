@@ -5,7 +5,7 @@
 #include <G4Threading.hh>
 
 #include "adept/AdeptOffload.hh"
-#include "celeritas/CeleritasOffload.hh"
+#include "celeritas/CeleritasOffloadBuilder.hh"
 #include "none/NoOffload.hh"
 
 namespace
@@ -45,7 +45,8 @@ build_offloader(GPUOffloadOptions const& op)
         case GPUOffloadBackend::Adept:
             return std::make_unique<AdeptOffload>();
         case GPUOffloadBackend::Celeritas:
-            return std::make_unique<CeleritasOffload>();
+        case GPUOffloadBackend::CeleritasCPU:
+            return BuildCeleritasOffload(op); 
         case GPUOffloadBackend::None:
             return std::make_unique<NoOffload>();
         default:
