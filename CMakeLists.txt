@@ -68,6 +68,7 @@ cuda_rdc_add_library(GPUOffload
   GPUOffload/GPUOffload.cc
   GPUOffload/adept/AdeptOffload.cc
   GPUOffload/adeptcpu/AdeptCPUOffload.cc
+  GPUOffload/adeptcpu/AdeptCPUTrackingManager.cc
   GPUOffload/celeritas/CeleritasOffload.cc
   GPUOffload/celeritas/CeleritasOffloadBuilder.cc
   GPUOffload/celeritas/Celeritas.cc

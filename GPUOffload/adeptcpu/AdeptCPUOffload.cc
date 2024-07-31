@@ -1,13 +1,13 @@
 #include "AdeptCPUOffload.hh"
 
-#include <G4HepEm/G4HepEmTrackingManager.hh>
+#include "AdeptCPUTrackingManager.hh"
 
 //! Return concrete tracking manager for this offloader
 std::unique_ptr<G4VTrackingManager> AdeptCPUOffload::MakeTrackingManager()
 {
     // Modelled after AdePT's AdePTPhysics::ConstructProcess(), but adapted
     // as we don't store the transporter/config in the physics list.
-    auto man = std::make_unique<G4HepEmTrackingManager>();
+    auto man = std::make_unique<AdeptCPUTrackingManager>();
     return man;
 }
 
